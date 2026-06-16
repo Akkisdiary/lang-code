@@ -3,43 +3,26 @@
 import sys
 from typing import Any
 
+from .ansi import Colors as ANSI
 
-class ChatRenderer:
-    """
-    Handles all console rendering for the chat agent using ANSI colors
-    for a modern, minimal look.
-    """
 
-    # ANSI Color Codes
-    COLOR_RESET = "\033[0m"
-    COLOR_SYSTEM = "\033[94m"  # Blue
-    COLOR_USER = "\033[92m"  # Green
-    COLOR_AI = "\033[96m"  # Cyan
-    COLOR_TOOL = "\033[93m"  # Yellow
-    COLOR_ERROR = "\033[91m"  # Red
+class TUI:
+    """Handles all console rendering"""
 
-    def __init__(self):
-        pass
+    def prompt_user(self):
+        return input(f"{ANSI.GREEN}> User: {ANSI.END}")
 
-    def display_system_prompt(self, prompt: str):
-        """Displays initial system instructions in a distinct block."""
-        print("\n" + "=" * 60)
-        print(
-            f"{self.COLOR_SYSTEM}SYSTEM INSTRUCTIONS LOADED{self.COLOR_RESET}"
-        )
-        print("=" * 60)
-        # Use standard text for the prompt content itself, but frame it with color
-        print(prompt)
-        print("-" * 60 + "\n")
+    def display_hint(self, content: str):
+        print(f"{ANSI.FAINT} {content}{ANSI.END}")
 
-    def display_user_input(self, user: Any):
+    def display_user_input(self, content: Any):
         """Displays the current user message."""
-        print(f"\n{self.COLOR_USER}> User: {user}{self.COLOR_RESET}")
+        print(f"\n{ANSI.GREEN}> User: {content}{ANSI.END}")
 
     def display_ai_message(self, content: Any):
         """Streams or displays AI response text."""
         # Use a subtle color for the AI output
-        print(f"\n{self.COLOR_AI}> AI: {self.COLOR_RESET}", end="", flush=True)
+        print(f"\n{ANSI.CYAN}> AI: {ANSI.END}", end="", flush=True)
         print(content)
 
     def display_tool_call_info(self, tool_name: str, args: dict):
@@ -48,14 +31,14 @@ class ChatRenderer:
         sargs = str(args)
         sargs = args[:64] + "..." if len(sargs) > 64 else ""
         print(
-            f"\n{self.COLOR_TOOL}[AGENT] Calling Tool: {tool_name}({sargs}){self.COLOR_RESET}"
+            f"\n{ANSI.YELLOW}[AGENT] Calling Tool: {tool_name}({sargs}){ANSI.END}"
         )
 
     def display_tool_result(self, content: Any):
         """Displays the output received from an executed tool, truncating for preview."""
         # Use a distinct color for machine/system results.
         print(
-            f"\n{self.COLOR_TOOL}[TOOL RESULT]: {self.COLOR_RESET}",
+            f"\n{ANSI.YELLOW}[TOOL RESULT]: {ANSI.END}",
             end="",
             flush=True,
         )
@@ -72,10 +55,6 @@ class ChatRenderer:
         """Displays critical errors or warnings."""
         # Use the error color and write to stderr for best practice.
         print(
-            f"\n{self.COLOR_ERROR}[ERROR]{self.COLOR_RESET} {message}",
+            f"\n{ANSI.RED}[ERROR]{ANSI.END} {message}",
             file=sys.stderr,
         )
-
-
-# Global instance for easy access in main loop
-renderer = ChatRenderer()
