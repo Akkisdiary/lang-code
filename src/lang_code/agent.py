@@ -63,14 +63,14 @@ class AgentSession:
     def add_human_message(self, message: str):
         self.conversation.append(HumanMessage(message))
 
-    def add_ai_msg(self, msg: str | AIMessage) -> None:
-        if isinstance(msg, AIMessage):
-            self.conversation.append(msg)
+    def add_ai_msg(self, message: str | AIMessage) -> None:
+        if isinstance(message, AIMessage):
+            self.conversation.append(message)
         else:
-            self.conversation.append(AIMessage(msg))
+            self.conversation.append(AIMessage(message))
 
-    def add_tool_msg(self, msg: ToolMessage) -> None:
-        self.conversation.append(msg)
+    def add_tool_msg(self, message: ToolMessage) -> None:
+        self.conversation.append(message)
 
 
 class Agent:
@@ -94,7 +94,7 @@ class Agent:
     def get_sys_prompt(self):
         with open(os.path.join(self.cwd, "AGENTS.md")) as f:
             prompt = f.read().strip()
-        prompt.replace("<<_LC_CWD>>", str(self.get_work_dir()))
+        prompt = prompt.replace("<<_LC_CWD>>", str(self.get_work_dir()))
         return SystemMessage(prompt)
 
     async def exec_tool(self, tool_call: ToolCall) -> ToolMessage:
@@ -122,22 +122,21 @@ class Agent:
     async def ainvoke(self, message: str):
         self.session.add_human_message(message)
 
-        try:
-            while True:
-                if not self.session.conversation:
-                    return
-                res: AIMessage = await self.model.ainvoke(
-                    self.session.conversation
-                )
-                self.session.add_ai_msg(res)
-                yield res
+        while True:
+            if not self.session.conversation:
+                return
+            res: AIMessage = await self.model.ainvoke(self.session.conversation)
+            self.session.add_ai_msg(res)
+            yield res
 
-                if res.tool_calls:
-                    for tool_call in res.tool_calls:
-                        tool_message = await self.exec_tool(tool_call)
-                        self.session.add_tool_msg(tool_message)
-                        yield tool_message
-                else:
-                    break
-        finally:
-            self.session.save()
+            if res.tool_calls:
+                for tool_call in res.tool_calls:
+                    tool_message = await self.exec_tool(tool_call)
+                    self.session.add_tool_msg(tool_message)
+                    yield tool_message
+            else:
+                break
+
+    def cleanup(self):
+        """Saves the conversation history when the agent session ends."""
+        self.session.save()

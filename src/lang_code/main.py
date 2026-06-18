@@ -27,16 +27,18 @@ async def run():
                     tui.display_tool_result(res.content)
                 else:
                     tui.display_warning(f"Unknown msg type: {res}")
-
     except KeyboardInterrupt:
-        tui.display_warning("\nChat interupted by user.")
+        tui.display_warning("\nChat interrupted by user.")
+    finally:
+        agent.cleanup()
 
 
 def main():
     try:
-        asyncio.run(run())
-    except Exception as e:
-        print("[ERROR]: Error in main loop")
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(run())
+    except Exception:
+        print("Error in main loop")
         traceback.print_exc()
 
 
