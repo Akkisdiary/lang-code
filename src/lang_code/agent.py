@@ -77,13 +77,16 @@ class Agent:
     def __init__(
         self,
         model: str = "gemma4-128k:latest",
+        thinking: str | bool | None = "high",
     ) -> None:
         self.cwd = Path.cwd()
         tools = build_file_tools(self.cwd)
         self._avail_tools = {t.name: t for t in tools}
-        self.model = ChatOllama(model=model, temperature=0.5).bind_tools(
-            tools=tools
-        )
+        self.model = ChatOllama(
+            model=model,
+            temperature=0.2,
+            reasoning=thinking,
+        ).bind_tools(tools=tools)
 
         self.session = AgentSession(self.get_sys_prompt())
         self.session.load()
