@@ -9,6 +9,7 @@ async def run():
     agent = Agent(
         model="deepseek-r1:14b",
         thinking="high",
+        persist_session=False,
     )
     tui = TUI()
 
@@ -21,13 +22,9 @@ async def run():
 
             async for res in agent.ainvoke(user_msg):
                 if isinstance(res, AIMessage):
-                    if res.content:
-                        tui.display_ai_message(res.content)
-                    if res.tool_calls:
-                        for tc in res.tool_calls:
-                            tui.display_tool_call(tc)
+                    tui.display_ai_message(res)
                 elif isinstance(res, ToolMessage):
-                    tui.display_tool_result(res.content)
+                    tui.display_tool_result(res)
                 else:
                     tui.display_warning(f"Unknown msg type: {res}")
     except KeyboardInterrupt:

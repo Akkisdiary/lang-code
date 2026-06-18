@@ -78,6 +78,7 @@ class Agent:
         self,
         model: str = "gemma4-128k:latest",
         thinking: str | bool | None = "low",
+        persist_session: bool = True,
     ) -> None:
         self.cwd = Path.cwd()
         tools = build_file_tools(self.cwd)
@@ -90,6 +91,7 @@ class Agent:
 
         self.session = AgentSession(self.get_sys_prompt())
         self.session.load()
+        self.persist_session = persist_session
 
     def get_work_dir(self):
         return self.cwd
@@ -145,4 +147,5 @@ class Agent:
 
     def cleanup(self):
         """Saves the conversation history when the agent session ends."""
-        self.session.save()
+        if self.persist_session:
+            self.session.save()

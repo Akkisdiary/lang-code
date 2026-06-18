@@ -1,9 +1,13 @@
 import difflib
 from typing import Any
 
-from langchain_core.messages import ToolCall
 
 from .ansi import Colors as ANSI
+from langchain_core.messages import (
+    AIMessage,
+    ToolCall,
+    ToolMessage,
+)
 
 PREVIEW_LEN = 64
 
@@ -18,14 +22,22 @@ class TUI:
         print(f"{ANSI.FAINT} {message}{ANSI.END}")
 
     def display_user_input(self, message: Any):
-        print(f"\n{ANSI.GREEN}> User: {message}{ANSI.END}")
+        print(f"{ANSI.GREEN}> User: {message}{ANSI.END}")
 
-    def display_ai_message(self, message: Any):
-        print(f"\n{ANSI.CYAN}> AI: {ANSI.END}", end="", flush=True)
-        print(message)
+    def display_ai_message(self, message: AIMessage):
+        reasoning = message.additional_kwargs.get("reasoning_content")
+        if reasoning:
+            print(
+                f"{ANSI.CYAN}> AI: {ANSI.END}"
+                f"{ANSI.FAINT}Reasoning...\n{reasoning}{ANSI.END}"
+            )
+        if message.content:
+            print(f"{ANSI.CYAN}> AI: {ANSI.END}{message.content}")
+        if message.tool_calls:
+            for tc in message.tool_calls:
+                self.display_tool_call(tc)
 
     def display_tool_call(self, tool_call: ToolCall):
-        """Displays a pending tool call, showing diff if it's an edit operation."""
         tool_name = tool_call.get("name")
         args = tool_call.get("args", {})
 
@@ -64,8 +76,8 @@ class TUI:
                 for line in old_lines[i1:i2]:
                     print(f"{ANSI.CYAN}  {line}{ANSI.END}")
 
-    def display_tool_result(self, message: str):
-        lines = str(message).strip().split("\n")
+    def display_tool_result(self, message: ToolMessage):
+        lines = str(message.content).strip().split("\n")
         first_line = lines[0]
         displayed_content = first_line[:PREVIEW_LEN]
         total_lines = len(lines)
