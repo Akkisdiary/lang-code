@@ -45,6 +45,9 @@ class TUI:
             file_path = args.get("path")
             print(f">> {ANSI.YELLOW}{tool_name}({file_path}){ANSI.END}")
             self.display_diff(args["old_string"], args["new_string"])
+        elif tool_name == "read_file":
+            file_path = args.get("path")
+            print(f">> {ANSI.YELLOW}{tool_name}({file_path}){ANSI.END}")
         else:
             # Standard display for other tool calls
             sargs = str(args)
