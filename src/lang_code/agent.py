@@ -21,6 +21,8 @@ from langchain_ollama import ChatOllama
 
 from .tools.fs import build_file_tools
 
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 
 class AgentSession:
     def __init__(
@@ -97,8 +99,7 @@ class Agent:
         return self.cwd
 
     def get_sys_prompt(self):
-        base_dir = os.path.dirname(__file__)
-        with open(os.path.join(base_dir, "prompts/SYSTEM.md"), "r") as f:
+        with open(os.path.join(BASE_DIR, "prompts/SYSTEM.md"), "r") as f:
             system_prompt = f.read().strip()
         system_prompt = system_prompt.replace(
             "<<_LC_CWD>>", str(self.get_work_dir())

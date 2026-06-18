@@ -7,9 +7,9 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 async def run():
     agent = Agent(
-        model="deepseek-r1:14b",
+        model="gemma4-128k:latest",
         thinking="high",
-        persist_session=False,
+        # persist_session=False,
     )
     tui = TUI()
 
