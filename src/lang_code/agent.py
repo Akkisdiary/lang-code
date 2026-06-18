@@ -92,10 +92,13 @@ class Agent:
         return self.cwd
 
     def get_sys_prompt(self):
-        with open(os.path.join(self.cwd, "AGENTS.md")) as f:
-            prompt = f.read().strip()
-        prompt = prompt.replace("<<_LC_CWD>>", str(self.get_work_dir()))
-        return SystemMessage(prompt)
+        base_dir = os.path.dirname(__file__)
+        with open(os.path.join(base_dir, "prompts/SYSTEM.md"), "r") as f:
+            system_prompt = f.read().strip()
+        system_prompt = system_prompt.replace(
+            "<<_LC_CWD>>", str(self.get_work_dir())
+        )
+        return SystemMessage(system_prompt)
 
     async def exec_tool(self, tool_call: ToolCall) -> ToolMessage:
         tool_name = tool_call.get("name")
