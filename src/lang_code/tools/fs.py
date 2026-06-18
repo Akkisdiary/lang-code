@@ -1,6 +1,6 @@
-"""File CRUD tools for the CLI chat, sandboxed to a working directory.
+"""File CRUD tools sandboxed to a working directory.
 
-All paths are resolved against ``workdir`` and rejected with a clear
+All paths are resolved against `workdir` and rejected with a clear
 error if they escape the sandbox. This keeps the model from reading or writing arbitrary files
 on disk.
 """
@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 
 
 def _resolve(workdir: Path, raw_path: str) -> Path:
-    """Resolve ``raw_path`` against ``workdir`` and ensure it stays inside."""
+    """Resolve `raw_path` against `workdir` and ensure it stays inside."""
     candidate = (workdir / raw_path).resolve()
     workdir_resolved = workdir.resolve()
     try:
@@ -33,7 +33,7 @@ def _resolve(workdir: Path, raw_path: str) -> Path:
 
 
 def build_file_tools(workdir: str | os.PathLike[str]) -> list:
-    """Create the file CRUD tools bound to ``workdir``."""
+    """Create the file CRUD tools bound to `workdir`."""
     root = Path(workdir).resolve()
     # Ensure the sandbox root exists when tools are built
     root.mkdir(parents=True, exist_ok=True)
@@ -42,7 +42,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def read_file(
-        path: Annotated[str, "Path relative to the working directory..."],
+        path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Read the contents of a text file. Returns an error string if the file is missing, not a regular file, or larger than 1 MB."""
         try:
@@ -62,7 +62,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def write_file(
-        path: Annotated[str, "Path relative to the working directory..."],
+        path: Annotated[str, "Path relative to the working directory"],
         content: Annotated[str, "The full text content to write."],
     ) -> str:
         """Create or overwrite a text file with the given content. Creates parent directories as needed."""
@@ -76,7 +76,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def list_dir(
-        path: Annotated[str, "Directory path relative..."] = ".",
+        path: Annotated[str, "Path relative to the working directory"] = ".",
     ) -> str:
         """List the immediate contents of a directory (names + type marker)."""
         try:
@@ -101,7 +101,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def delete_file(
-        path: Annotated[str, "Path relative to the working directory..."],
+        path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Delete a file or empty directory."""
         try:
@@ -166,7 +166,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def edit_file(
-        path: Annotated[str, "Path relative to the working directory..."],
+        path: Annotated[str, "Path relative to the working directory"],
         old_string: Annotated[str, "String to find and replace."],
         new_string: Annotated[str, "New string to insert."],
     ) -> str:
