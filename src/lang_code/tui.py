@@ -1,7 +1,9 @@
-from typing import Any
 import difflib
-from .ansi import Colors as ANSI
+from typing import Any
+
 from langchain_core.messages import ToolCall
+
+from .ansi import Colors as ANSI
 
 PREVIEW_LEN = 64
 
