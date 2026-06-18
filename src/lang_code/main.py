@@ -1,9 +1,11 @@
+import traceback
+import asyncio
 from .agent import Agent
 from .tui import TUI
 from langchain_core.messages import AIMessage, ToolMessage
 
 
-def main():
+async def run():
     agent = Agent()
     tui = TUI()
 
@@ -14,7 +16,7 @@ def main():
             if not user_msg.strip():
                 continue
 
-            for res in agent.invoke(user_msg):
+            async for res in agent.ainvoke(user_msg):
                 if isinstance(res, AIMessage):
                     if res.content:
                         tui.display_ai_message(res.content)
@@ -28,6 +30,14 @@ def main():
 
     except KeyboardInterrupt:
         tui.display_warning("\nChat interupted by user.")
+
+
+def main():
+    try:
+        asyncio.run(run())
+    except Exception as e:
+        print("[ERROR]: Error in main loop")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

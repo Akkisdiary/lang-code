@@ -97,7 +97,7 @@ class Agent:
         prompt.replace("<<_LC_CWD>>", str(self.get_work_dir()))
         return SystemMessage(prompt)
 
-    def exec_tool(self, tool_call: ToolCall) -> ToolMessage:
+    async def exec_tool(self, tool_call: ToolCall) -> ToolMessage:
         tool_name = tool_call.get("name")
         tool = self._avail_tools.get(tool_name)
         status = "error"
@@ -119,20 +119,22 @@ class Agent:
             status=status,
         )
 
-    def invoke(self, message: str):
+    async def ainvoke(self, message: str):
         self.session.add_human_message(message)
 
         try:
             while True:
                 if not self.session.conversation:
                     return
-                res: AIMessage = self.model.invoke(self.session.conversation)
+                res: AIMessage = await self.model.ainvoke(
+                    self.session.conversation
+                )
                 self.session.add_ai_msg(res)
                 yield res
 
                 if res.tool_calls:
                     for tool_call in res.tool_calls:
-                        tool_message = self.exec_tool(tool_call)
+                        tool_message = await self.exec_tool(tool_call)
                         self.session.add_tool_msg(tool_message)
                         yield tool_message
                 else:
