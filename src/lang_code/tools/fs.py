@@ -38,27 +38,22 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
     # Ensure the sandbox root exists when tools are built
     root.mkdir(parents=True, exist_ok=True)
 
-    # --- Tool Definitions (Keep them clean and focused on I/O) ---
-
     @tool
     def read_file(
         path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Read the contents of a text file. Returns an error string if the file is missing, not a regular file, or larger than 1 MB."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         if not target.exists():
-            return f"error: '{path}' does not exist"
+            return f"'{path}' does not exist"
         if not target.is_file():
-            return f"error: '{path}' is not a regular file"
+            return f"'{path}' is not a regular file"
         if target.stat().st_size > 1_000_000:
-            return f"error: '{path}' is larger than 1 MB; refusing to read"
+            return f"'{path}' is larger than 1 MB; refusing to read"
         try:
             return target.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            return f"error: '{path}' is not a UTF-8 text file"
+            return f"'{path}' is not a UTF-8 text file"
 
     @tool
     def write_file(
@@ -66,10 +61,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         content: Annotated[str, "The full text content to write."],
     ) -> str:
         """Create or overwrite a text file with the given content. Creates parent directories as needed."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         return f"wrote {len(content)} chars to {target.relative_to(root)}"
@@ -79,14 +71,11 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         path: Annotated[str, "Path relative to the working directory"] = ".",
     ) -> str:
         """List the immediate contents of a directory (names + type marker)."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         if not target.exists():
-            return f"error: '{path}' does not exist"
+            raise ValueError(f"'{path}' does not exist")
         if not target.is_dir():
-            return f"error: '{path}' is not a directory"
+            raise ValueError(f"'{path}' is not a directory")
         entries: list[str] = []
         for child in sorted(target.iterdir()):
             if child.is_dir():
@@ -104,15 +93,12 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Delete a file or empty directory."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         if not target.exists():
-            return f"error: '{path}' does not exist"
+            raise ValueError(f"'{path}' does not exist")
         if target.is_dir():
-            return (
-                f"error: '{path}' is a directory; use delete_dir_recursive "
+            raise ValueError(
+                f"'{path}' is a directory; use delete_dir_recursive "
                 "to remove it"
             )
         target.unlink()
@@ -120,19 +106,16 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
 
     @tool
     def delete_dir_recursive(
-        path: Annotated[str, "Directory path relative..."],
+        path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Recursively delete a directory and all of its contents."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         if not target.exists():
-            return f"error: '{path}' does not exist"
+            raise ValueError("'{path}' does not exist")
         if not target.is_dir():
-            return f"error: '{path}' is not a directory"
+            raise ValueError("'{path}' is not a directory")
         if target == root:
-            return "error: refusing to delete the working directory root"
+            raise ValueError("refusing to delete the working directory root")
         shutil.rmtree(target)
         return f"removed directory {target.relative_to(root)}"
 
@@ -141,12 +124,9 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         path: Annotated[str, "Path relative to the working directory."],
     ) -> str:
         """Return existence, type, size (bytes) and modification time for a path."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        target = _resolve(root, path)
         if not target.exists():
-            return f"error: '{path}' does not exist"
+            raise ValueError(f"'{path}' does not exist")
         stat = target.stat()
         kind = (
             "directory"
@@ -170,37 +150,40 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         old_string: Annotated[str, "String to find and replace."],
         new_string: Annotated[str, "New string to insert."],
     ) -> str:
-        """Reads a file, replaces all occurrences of old_string with new_string, and overwrites the file."""
-        try:
-            target = _resolve(root, path)
-        except ValueError as e:
-            return f"error: {e}"
+        """
+        Performs exact string replacements in files.
+        Usage:
+        - When editing text from read_file tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears.
+        - This tools works finding & replacing old_string in the file. ALWAYS prefer editing a file in small chunks to avoid miss match due to trivial error.
+        """
+
+        target = _resolve(root, path)
 
         if not target.exists():
-            return f"error: '{path}' does not exist."
+            raise ValueError(f"'{path}' does not exist.")
         if not target.is_file():
-            return f"error: '{path}' is not a file; cannot edit."
+            raise ValueError(f"'{path}' is not a file; cannot edit.")
 
         try:
             original_content = target.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            return f"error: '{path}' is not a UTF-8 text file."
+            raise ValueError(f"'{path}' is not a UTF-8 text file.")
 
         if old_string == "" and new_string == "":
-            return "warning: both strings empty. No change made."
+            raise ValueError("both strings empty. No change made.")
 
-        # Perform replacement
+        if old_string not in original_content:
+            raise ValueError(
+                f"old_string not present in {target.relative_to(root)}."
+            )
+
         new_content = original_content.replace(old_string, new_string)
 
-        if new_content == original_content:
-            return f"no changes found. '{old_string}' not present in {target.relative_to(root)}."
-
-        # Write back the modified content
         try:
             target.write_text(new_content, encoding="utf-8")
             return f"Successfully replaced all occurrences of '{old_string}' with '{new_string}' in {target.relative_to(root)}."
         except Exception as e:
-            return f"error writing file: {e}"
+            raise ValueError(f"error writing file: {e}")
 
     return [
         read_file,
