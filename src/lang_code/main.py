@@ -6,7 +6,10 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 
 async def run():
-    agent = Agent()
+    agent = Agent(
+        model="deepseek-r1:14b",
+        thinking="high",
+    )
     tui = TUI()
 
     try:
