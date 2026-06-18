@@ -54,9 +54,9 @@ class AgentSession:
         self.session_history_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(self.session_history_path, "w") as f:
-                json.dump(
-                    messages_to_dict(self.conversation), f
-                )  # Don't store the system prompt
+                # don't store the system prompt
+                msg_json = messages_to_dict(self.conversation[1:])
+                json.dump(msg_json, f)
         except Exception as e:
             print(f"Error saving history: {e}")
 
