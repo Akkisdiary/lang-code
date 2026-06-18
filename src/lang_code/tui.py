@@ -14,15 +14,15 @@ class TUI:
     def prompt_user(self):
         return input(f"{ANSI.GREEN}> User: {ANSI.END}")
 
-    def display_hint(self, content: str):
-        print(f"{ANSI.FAINT} {content}{ANSI.END}")
+    def display_hint(self, message: str):
+        print(f"{ANSI.FAINT} {message}{ANSI.END}")
 
-    def display_user_input(self, content: Any):
-        print(f"\n{ANSI.GREEN}> User: {content}{ANSI.END}")
+    def display_user_input(self, message: Any):
+        print(f"\n{ANSI.GREEN}> User: {message}{ANSI.END}")
 
-    def display_ai_message(self, content: Any):
+    def display_ai_message(self, message: Any):
         print(f"\n{ANSI.CYAN}> AI: {ANSI.END}", end="", flush=True)
-        print(content)
+        print(message)
 
     def display_tool_call(self, tool_call: ToolCall):
         """Displays a pending tool call, showing diff if it's an edit operation."""
@@ -64,8 +64,8 @@ class TUI:
                 for line in old_lines[i1:i2]:
                     print(f"{ANSI.CYAN}  {line}{ANSI.END}")
 
-    def display_tool_result(self, content: Any):
-        lines = str(content).strip().split("\n")
+    def display_tool_result(self, message: str):
+        lines = str(message).strip().split("\n")
         first_line = lines[0]
         displayed_content = first_line[:PREVIEW_LEN]
         total_lines = len(lines)
