@@ -118,9 +118,7 @@ class Agent:
                 result = tool.invoke(args)
                 status = "success"
             except Exception as e:
-                result = (
-                    f"Error during tool execution: {type(e).__name__}: {str(e)}"
-                )
+                result = f"Error executing tool {tool_name}: {e}"
         return ToolMessage(
             name=tool_name,
             content=result,
