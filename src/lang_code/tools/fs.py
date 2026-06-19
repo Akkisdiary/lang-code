@@ -8,11 +8,9 @@ on disk.
 from __future__ import annotations
 
 import os
-import shutil
-from datetime import datetime
+import subprocess
 from pathlib import Path
 from typing import Annotated
-
 
 from langchain_core.tools import tool
 
@@ -39,7 +37,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
     root.mkdir(parents=True, exist_ok=True)
 
     @tool
-    def read_file(
+    def read(
         path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Read the contents of a text file. Returns an error string if the file is missing, not a regular file, or larger than 1 MB."""
@@ -56,96 +54,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
             return f"'{path}' is not a UTF-8 text file"
 
     @tool
-    def write_file(
-        path: Annotated[str, "Path relative to the working directory"],
-        content: Annotated[str, "The full text content to write."],
-    ) -> str:
-        """Create or overwrite a text file with the given content. Creates parent directories as needed."""
-        target = _resolve(root, path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-        return f"wrote {len(content)} chars to {target.relative_to(root)}"
-
-    @tool
-    def list_dir(
-        path: Annotated[str, "Path relative to the working directory"] = ".",
-    ) -> str:
-        """List the immediate contents of a directory (names + type marker)."""
-        target = _resolve(root, path)
-        if not target.exists():
-            raise ValueError(f"'{path}' does not exist")
-        if not target.is_dir():
-            raise ValueError(f"'{path}' is not a directory")
-        entries: list[str] = []
-        for child in sorted(target.iterdir()):
-            if child.is_dir():
-                entries.append(f"[dir]  {child.name}")
-            elif child.is_file():
-                entries.append(f"[file] {child.name}")
-            else:
-                entries.append(f"[?]    {child.name}")
-        if not entries:
-            return "(empty directory)"
-        return "\n".join(entries)
-
-    @tool
-    def delete_file(
-        path: Annotated[str, "Path relative to the working directory"],
-    ) -> str:
-        """Delete a file or empty directory."""
-        target = _resolve(root, path)
-        if not target.exists():
-            raise ValueError(f"'{path}' does not exist")
-        if target.is_dir():
-            raise ValueError(
-                f"'{path}' is a directory; use delete_dir_recursive "
-                "to remove it"
-            )
-        target.unlink()
-        return f"deleted {target.relative_to(root)}"
-
-    @tool
-    def delete_dir_recursive(
-        path: Annotated[str, "Path relative to the working directory"],
-    ) -> str:
-        """Recursively delete a directory and all of its contents."""
-        target = _resolve(root, path)
-        if not target.exists():
-            raise ValueError("'{path}' does not exist")
-        if not target.is_dir():
-            raise ValueError("'{path}' is not a directory")
-        if target == root:
-            raise ValueError("refusing to delete the working directory root")
-        shutil.rmtree(target)
-        return f"removed directory {target.relative_to(root)}"
-
-    @tool
-    def file_info(
-        path: Annotated[str, "Path relative to the working directory."],
-    ) -> str:
-        """Return existence, type, size (bytes) and modification time for a path."""
-        target = _resolve(root, path)
-        if not target.exists():
-            raise ValueError(f"'{path}' does not exist")
-        stat = target.stat()
-        kind = (
-            "directory"
-            if target.is_dir()
-            else "file" if target.is_file() else "other"
-        )
-        mtime = datetime.fromtimestamp(stat.st_mtime).isoformat(
-            timespec="seconds"
-        )
-        return (
-            f"exists: True\n"
-            f"type: {kind}\n"
-            f"size_bytes: {stat.st_size}\n"
-            f"modified: {mtime}\n"
-            f"path: {target.relative_to(root)}"
-        )
-
-    @tool
-    def edit_file(
+    def edit(
         path: Annotated[str, "Path relative to the working directory"],
         old_string: Annotated[str, "String to find and replace."],
         new_string: Annotated[str, "New string to insert."],
@@ -191,12 +100,69 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         except Exception as e:
             raise ValueError(f"error writing file: {e}")
 
+    @tool
+    def glob(
+        path: Annotated[str, "Path relative to the working directory"],
+        pattern: Annotated[str, "Glob pattern (e.g., '*.py', '**/*.js')."],
+    ) -> str:
+        """Find all files matching a given glob pattern within the specified path."""
+        target = _resolve(root, path)
+        if not target.exists():
+            raise ValueError(f"'{path}' does not exist")
+
+        # Use rglob for recursive search if the pattern suggests it (e.g., contains **)
+        try:
+            found_paths = list(target.rglob(pattern))
+        except Exception as e:
+            return f"Error executing glob pattern '{pattern}': {e}"
+
+        if not found_paths:
+            return "No files found matching the pattern."
+
+        results: list[str] = []
+        for p in found_paths:
+            # Only report paths that are actual files, and ensure they are within the sandbox
+            relative_path = str(p.relative_to(root))
+            if p.is_dir():
+                results.append(f"[dir] {relative_path}")
+            elif p.is_file():
+                results.append(f"[file] {relative_path}")
+            else:
+                results.append(f"[unknown] {relative_path}")
+
+        return "\n".join(sorted(results))
+
+    @tool
+    def bash(
+        command: Annotated[
+            str, "The shell command to execute (e.g., 'ls -l', 'git status')."
+        ],
+    ) -> str:
+        """
+        Executes a system shell command in the current working directory.
+        WARNING: This tool executes arbitrary code and bypasses file sandboxing. Use with extreme caution.
+        Output includes stdout followed by stderr if any errors occur.
+        """
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=root,
+            )
+            return (
+                f"STDOUT:\n{result.stdout}\n\nSTDERR (if any):\n{result.stderr}"
+            )
+        except subprocess.CalledProcessError as e:
+            return f"ERROR executing command '{command}':\nReturn Code: {e.returncode}\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}"
+        except Exception as e:
+            return f"CRITICAL ERROR during shell execution: {str(e)}"
+
     return [
-        read_file,
-        write_file,
-        list_dir,
-        delete_file,
-        delete_dir_recursive,
-        file_info,
-        edit_file,
+        read,
+        edit,
+        glob,
+        bash,
     ]

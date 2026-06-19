@@ -29,8 +29,8 @@ class AgentSession:
         self,
         system_prompt: SystemMessage | None = None,
     ) -> None:
-        self.session_history_path = (
-            Path(".agents") / "session" / "conversation_history.json"
+        self.sessions_path = (
+            Path(".agents") / "sessions" / "conversation_history.json"
         )
 
         if system_prompt:
@@ -39,10 +39,10 @@ class AgentSession:
             self.conversation = []
 
     def load(self):
-        if not self.session_history_path.exists():
+        if not self.sessions_path.exists():
             return
         try:
-            with open(self.session_history_path, "r") as f:
+            with open(self.sessions_path, "r") as f:
                 history = json.load(f)
                 self.conversation.extend(messages_from_dict(history))
         except json.JSONDecodeError:
@@ -53,9 +53,9 @@ class AgentSession:
             print(f"Error loading history: {e}. Starting fresh.")
 
     def save(self):
-        self.session_history_path.parent.mkdir(parents=True, exist_ok=True)
+        self.sessions_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(self.session_history_path, "w") as f:
+            with open(self.sessions_path, "w") as f:
                 # don't store the system prompt
                 msg_json = messages_to_dict(self.conversation[1:])
                 json.dump(msg_json, f)
