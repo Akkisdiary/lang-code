@@ -164,13 +164,19 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         if not target.is_file():
             raise ValueError(f"'{path}' is not a file; cannot edit.")
 
+        if not old_string and not new_string:
+            raise ValueError("both old_string & new_string cannot be empty")
+
+        if not old_string:
+            raise ValueError("old_string cannot be empty")
+
+        if not new_string:
+            raise ValueError("new_string cannot be empty")
+
         try:
             original_content = target.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             raise ValueError(f"'{path}' is not a UTF-8 text file.")
-
-        if old_string == "" and new_string == "":
-            raise ValueError("both strings empty. No change made.")
 
         if old_string not in original_content:
             raise ValueError(

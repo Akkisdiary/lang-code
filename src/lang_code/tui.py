@@ -91,10 +91,10 @@ class TUI:
             if len(first_line) <= PREVIEW_LEN
             else f"{displayed_content}..."
         )
-        output = (
-            f"{ANSI.FAINT}{preview_text} +{total_lines - 1} lines{ANSI.END}"
-        )
-        print(output)
+        if total_lines - 1 > 0:
+            preview_text = preview_text + f" +{total_lines - 1}"
+
+        print(f"{ANSI.FAINT}{preview_text}{ANSI.END}")
 
     def display_error(self, message: str):
         print(f"{ANSI.RED}{ANSI.END}{message}")
