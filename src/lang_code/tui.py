@@ -19,10 +19,10 @@ class TUI:
         return input(f"{ANSI.GREEN}> User: {ANSI.END}")
 
     def display_hint(self, message: str):
-        print(f"{ANSI.FAINT} {message}{ANSI.END}")
+        print(f"{ANSI.FAINT}! - {message}{ANSI.END}")
 
-    def display_user_input(self, message: Any):
-        print(f"{ANSI.GREEN}> User: {message}{ANSI.END}")
+    def display_human_message(self, message: Any):
+        print(f"{ANSI.GREEN}> User:{ANSI.END} {message.content}")
 
     def display_ai_message(self, message: AIMessage):
         reasoning = message.additional_kwargs.get("reasoning_content")
@@ -32,7 +32,12 @@ class TUI:
                 f"{ANSI.FAINT}Reasoning...\n{reasoning}{ANSI.END}"
             )
         if message.content:
-            print(f"{ANSI.CYAN}> AI: {ANSI.END}{message.content}")
+            if isinstance(message.content, list):
+                for part in message.content:
+                    if part.get("type") == "text":
+                        print(f"{ANSI.CYAN}> AI: {ANSI.END}{part.get("text")}")
+            else:
+                print(f"{ANSI.CYAN}> AI: {ANSI.END}{message.content}")
         if message.tool_calls:
             for tc in message.tool_calls:
                 self.display_tool_call(tc)
@@ -41,13 +46,16 @@ class TUI:
         tool_name = tool_call.get("name")
         args = tool_call.get("args", {})
 
-        if tool_name == "edit_file":
-            file_path = args.get("path")
-            print(f">> {ANSI.YELLOW}{tool_name}({file_path}){ANSI.END}")
-            self.display_diff(args["old_string"], args["new_string"])
-        elif tool_name == "read_file":
-            file_path = args.get("path")
-            print(f">> {ANSI.YELLOW}{tool_name}({file_path}){ANSI.END}")
+        if tool_name in ("edit", "read", "bash"):
+            arg = args.get("path") or args.get("command")
+            print(f">> {ANSI.YELLOW}{tool_name}({arg}){ANSI.END}")
+            if tool_name == "edit":
+                if not args.get("old_string") or not args.get("new_string"):
+                    print(f"{ANSI.RED}Invalid tool call{ANSI.END}")
+                    print("old_string:", args.get("old_string"))
+                    print("new_string:", args.get("new_string"))
+                else:
+                    self.display_diff(args["old_string"], args["new_string"])
         else:
             # Standard display for other tool calls
             sargs = str(args)
@@ -92,7 +100,7 @@ class TUI:
             else f"{displayed_content}..."
         )
         if total_lines - 1 > 0:
-            preview_text = preview_text + f" +{total_lines - 1}"
+            preview_text = preview_text + f" +{total_lines - 1} lines"
 
         print(f"{ANSI.FAINT}{preview_text}{ANSI.END}")
 

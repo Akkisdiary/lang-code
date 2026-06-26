@@ -1,8 +1,10 @@
-import traceback
 import asyncio
+import traceback
+
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
 from .agent import Agent
 from .tui import TUI
-from langchain_core.messages import AIMessage, ToolMessage
 
 
 async def run():
@@ -20,17 +22,33 @@ async def run():
             if not user_msg.strip():
                 continue
 
-            async for res in agent.ainvoke(user_msg):
-                if isinstance(res, AIMessage):
-                    tui.display_ai_message(res)
-                elif isinstance(res, ToolMessage):
-                    tui.display_tool_result(res)
+            stream = await agent.astream_events(user_msg)
+            async for snapshot in stream.values:
+                latest = snapshot["messages"][-1]
+                if latest.content:
+                    if isinstance(latest, AIMessage):
+                        tui.display_ai_message(latest)
+                    elif isinstance(latest, ToolMessage):
+                        tui.display_tool_result(latest)
+                    elif isinstance(latest, HumanMessage):
+                        # tui.display_human_message(latest)
+                        pass
+                    else:
+                        tui.display_warning(
+                            f"Unknown msg type: {type(latest)}: {latest}"
+                        )
+                elif latest.tool_calls:
+                    for tool_call in latest.tool_calls:
+                        tui.display_tool_call(tool_call)
                 else:
-                    tui.display_warning(f"Unknown msg type: {res}")
+                    tui.display_warning(
+                        f"Unkown snapshot: {type(snapshot)} - {snapshot}"
+                    )
+
     except KeyboardInterrupt:
         tui.display_warning("\nChat interrupted by user.")
     finally:
-        agent.cleanup()
+        await agent.cleanup()
 
 
 def main():

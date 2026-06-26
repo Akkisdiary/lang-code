@@ -1,78 +1,26 @@
 import os
+import uuid
 from pathlib import Path
 
+import aiosqlite
 from dotenv import load_dotenv
 
 load_dotenv()
 
-import json
-
+from langchain.agents import create_agent
 from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
     HumanMessage,
     SystemMessage,
     ToolCall,
     ToolMessage,
-    messages_from_dict,
-    messages_to_dict,
 )
+from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .tools.fs import build_file_tools
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-
-class AgentSession:
-    def __init__(
-        self,
-        system_prompt: SystemMessage | None = None,
-    ) -> None:
-        self.sessions_path = (
-            Path(".agents") / "sessions" / "conversation_history.json"
-        )
-
-        if system_prompt:
-            self.conversation: list[BaseMessage] = [system_prompt]
-        else:
-            self.conversation = []
-
-    def load(self):
-        if not self.sessions_path.exists():
-            return
-        try:
-            with open(self.sessions_path, "r") as f:
-                history = json.load(f)
-                self.conversation.extend(messages_from_dict(history))
-        except json.JSONDecodeError:
-            print(
-                "Warning: Could not decode conversation history file. Starting fresh."
-            )
-        except Exception as e:
-            print(f"Error loading history: {e}. Starting fresh.")
-
-    def save(self):
-        self.sessions_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with open(self.sessions_path, "w") as f:
-                # don't store the system prompt
-                msg_json = messages_to_dict(self.conversation[1:])
-                json.dump(msg_json, f)
-        except Exception as e:
-            print(f"Error saving history: {e}")
-
-    def add_human_message(self, message: str):
-        self.conversation.append(HumanMessage(message))
-
-    def add_ai_msg(self, message: str | AIMessage) -> None:
-        if isinstance(message, AIMessage):
-            self.conversation.append(message)
-        else:
-            self.conversation.append(AIMessage(message))
-
-    def add_tool_msg(self, message: ToolMessage) -> None:
-        self.conversation.append(message)
 
 
 class Agent:
@@ -80,30 +28,36 @@ class Agent:
         self,
         model: str = "gemma4-128k:latest",
         thinking: str | bool | None = "low",
-        persist_session: bool = True,
     ) -> None:
         self.cwd = Path.cwd()
+        self.config_dir = self.cwd / ".agents"
+        self.sessions_dir = self.config_dir / "sessions"
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
         tools = build_file_tools(self.cwd)
         self._avail_tools = {t.name: t for t in tools}
+
+        self.config: RunnableConfig = {
+            "configurable": {"thread_id": str(uuid.uuid4())}
+        }
+        system_prompt = self.get_sys_prompt()
         self.model = ChatOllama(
             model=model,
             temperature=0.4,
             reasoning=thinking,
-        ).bind_tools(tools=tools)
-
-        self.session = AgentSession(self.get_sys_prompt())
-        self.session.load()
-        self.persist_session = persist_session
-
-    def get_work_dir(self):
-        return self.cwd
+        )
+        self.conn = aiosqlite.connect(self.sessions_dir / "session.sqlite")
+        self.checkpoint = AsyncSqliteSaver(self.conn)
+        self._agent = create_agent(
+            model=self.model,
+            tools=tools,
+            system_prompt=system_prompt,
+            checkpointer=self.checkpoint,
+        )
 
     def get_sys_prompt(self):
         with open(os.path.join(BASE_DIR, "prompts/SYSTEM.md"), "r") as f:
             system_prompt = f.read().strip()
-        system_prompt = system_prompt.replace(
-            "<<_LC_CWD>>", str(self.get_work_dir())
-        )
+        system_prompt = system_prompt.replace("<<_LC_CWD>>", str(self.cwd))
         return SystemMessage(system_prompt)
 
     async def exec_tool(self, tool_call: ToolCall) -> ToolMessage:
@@ -127,24 +81,18 @@ class Agent:
         )
 
     async def ainvoke(self, message: str):
-        self.session.add_human_message(message)
+        return await self._agent.ainvoke(
+            {"messages": [HumanMessage(message)]},
+            config=self.config,
+        )
 
-        while True:
-            if not self.session.conversation:
-                return
-            res: AIMessage = await self.model.ainvoke(self.session.conversation)
-            self.session.add_ai_msg(res)
-            yield res
+    async def astream_events(self, message: str):
+        return await self._agent.astream_events(
+            {"messages": [HumanMessage(message)]},
+            config=self.config,
+            version="v3",
+        )
 
-            if res.tool_calls:
-                for tool_call in res.tool_calls:
-                    tool_message = await self.exec_tool(tool_call)
-                    self.session.add_tool_msg(tool_message)
-                    yield tool_message
-            else:
-                break
-
-    def cleanup(self):
+    async def cleanup(self):
         """Saves the conversation history when the agent session ends."""
-        if self.persist_session:
-            self.session.save()
+        await self.conn.close()

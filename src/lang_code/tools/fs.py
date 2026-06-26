@@ -41,17 +41,21 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         path: Annotated[str, "Path relative to the working directory"],
     ) -> str:
         """Read the contents of a text file. Returns an error string if the file is missing, not a regular file, or larger than 1 MB."""
-        target = _resolve(root, path)
+        try:
+            target = _resolve(root, path)
+        except Exception as e:
+            return f"Error: {e}"
+
         if not target.exists():
-            return f"'{path}' does not exist"
+            return f"Error: '{path}' does not exist"
         if not target.is_file():
-            return f"'{path}' is not a regular file"
+            return f"Error: '{path}' is not a regular file"
         if target.stat().st_size > 1_000_000:
-            return f"'{path}' is larger than 1 MB; refusing to read"
+            return f"Error: '{path}' is larger than 1 MB; refusing to read"
         try:
             return target.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            return f"'{path}' is not a UTF-8 text file"
+            return f"Error: '{path}' is not a UTF-8 text file"
 
     @tool
     def edit(
@@ -66,30 +70,33 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         - This tools works finding & replacing old_string in the file. ALWAYS prefer editing a file in small chunks to avoid miss match due to trivial error.
         """
 
-        target = _resolve(root, path)
+        try:
+            target = _resolve(root, path)
+        except Exception as e:
+            return f"Error: {e}"
 
         if not target.exists():
-            raise ValueError(f"'{path}' does not exist.")
+            return f"Error: '{path}' does not exist."
         if not target.is_file():
-            raise ValueError(f"'{path}' is not a file; cannot edit.")
+            return f"Error: '{path}' is not a file; cannot edit."
 
         if not old_string and not new_string:
-            raise ValueError("both old_string & new_string cannot be empty")
+            return "Error: both old_string & new_string cannot be empty"
 
         if not old_string:
-            raise ValueError("old_string cannot be empty")
+            return "Error: old_string cannot be empty"
 
         if not new_string:
-            raise ValueError("new_string cannot be empty")
+            return "Error: new_string cannot be empty"
 
         try:
             original_content = target.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            raise ValueError(f"'{path}' is not a UTF-8 text file.")
+            return f"'Error: {path}' is not a UTF-8 text file."
 
         if old_string not in original_content:
-            raise ValueError(
-                f"old_string not present in {target.relative_to(root)}."
+            return (
+                f"Error: old_string not present in {target.relative_to(root)}."
             )
 
         new_content = original_content.replace(old_string, new_string)
@@ -98,7 +105,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
             target.write_text(new_content, encoding="utf-8")
             return f"Successfully replaced all occurrences of '{old_string}' with '{new_string}' in {target.relative_to(root)}."
         except Exception as e:
-            raise ValueError(f"error writing file: {e}")
+            return f"Error: {e}"
 
     @tool
     def glob(
@@ -106,9 +113,14 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         pattern: Annotated[str, "Glob pattern (e.g., '*.py', '**/*.js')."],
     ) -> str:
         """Find all files matching a given glob pattern within the specified path."""
-        target = _resolve(root, path)
+
+        try:
+            target = _resolve(root, path)
+        except Exception as e:
+            return f"Error: {e}"
+
         if not target.exists():
-            raise ValueError(f"'{path}' does not exist")
+            return f"Error: '{path}' does not exist"
 
         # Use rglob for recursive search if the pattern suggests it (e.g., contains **)
         try:
