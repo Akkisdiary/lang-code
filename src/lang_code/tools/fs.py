@@ -67,6 +67,7 @@ def build_file_tools(workdir: str | os.PathLike[str]) -> list:
         Performs exact string replacements in files.
         Usage:
         - When editing text from read_file tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears.
+        - When editing files, always make sure to read the latest file contents using the `read` tool.
         - This tools works finding & replacing old_string in the file. ALWAYS prefer editing a file in small chunks to avoid miss match due to trivial error.
         """
 
